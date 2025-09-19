@@ -1,0 +1,3 @@
+[submodule "google-calendar-mpc"]
+	path = google-calendar-mpc
+	url = https://github.com/nspady/google-calendar-mcp.git

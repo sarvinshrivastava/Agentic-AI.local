@@ -18,7 +18,7 @@ load_dotenv()
 
 
 class CalendarAssistantPro:
-    def __init__(self, user_email: str = "vivek176iitv@gmail.com"):
+    def __init__(self, user_email: str = "sarvin5124@gmail.com"):
         self.user_email = user_email
         self.openai_client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
         self.conversation_history: List[Dict[str, Any]] = []
