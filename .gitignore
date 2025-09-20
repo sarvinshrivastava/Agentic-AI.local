@@ -5,3 +5,5 @@
 # Embedded Git repositories
 Gmail-MCP-Server/
 google-calendar-mcp/
+
+__pycache__/
