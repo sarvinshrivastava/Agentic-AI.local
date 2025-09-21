@@ -16,16 +16,18 @@ from mcp_orchestrator_pro import MCPOrchestratorPro
 
 load_dotenv()
 
+MODEL = os.getenv("OPENAI_MODEL", "gpt-4o")
 
 class CalendarAssistantPro:
-    def __init__(self, user_email: str = "sarvin5124@gmail.com"):
+    def __init__(self, user_email: str = "sarvin5124@gmail.com", gmail_url: str = "http://localhost:3001"):
         self.user_email = user_email
+        self.gmail_url = gmail_url
         self.openai_client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
         self.conversation_history: List[Dict[str, Any]] = []
         self.max_iterations = 10  # Prevent infinite loops
         
         # System prompt for the enhanced calendar assistant
-        self.system_prompt = f"""You are Calendar Assistant Pro, an advanced AI assistant for {user_email} that can manage both Google Calendar and Notion workspace.
+        self.system_prompt = f"""You are Calendar Assistant Pro, an advanced AI assistant for {user_email} that can manage Google Calendar, Notion workspace, and Gmail email operations.
 
 ## 🗓️ **Calendar Management Capabilities:**
 1. **Reading Calendar Data:**
@@ -64,9 +66,35 @@ class CalendarAssistantPro:
    - Provide context from documents when discussing meetings
    - Combine information from both calendar and Notion for comprehensive responses
 
+## 📧 **Gmail Email Management:**
+1. **Reading Emails:**
+   - Search emails by keywords, sender, subject, date range
+   - Read email content including threads and attachments
+   - List emails with filtering options
+   - Get email metadata (sender, recipients, date, subject)
+
+2. **Sending Emails:**
+   - Send new emails with text or HTML content
+   - Reply to existing emails
+   - Forward emails to other recipients
+   - Add attachments to outgoing emails
+
+3. **Email Organization:**
+   - List and manage Gmail labels
+   - Apply labels to emails for organization
+   - Create and manage email filters
+   - Archive, delete, or mark emails as read/unread
+
+4. **Email-Calendar Integration:**
+   - Send meeting invites via email after creating calendar events
+   - Email event details to participants
+   - Find emails related to calendar events
+   - Extract meeting information from emails to create calendar events
+
 ## 🎯 **Key Features:**
-- **Contextual Responses**: Use information from both calendar and Notion to provide comprehensive answers
-- **Multi-step Operations**: Handle complex requests that involve both calendar and document operations
+- **Contextual Responses**: Use information from calendar, Notion, and Gmail to provide comprehensive answers
+- **Multi-step Operations**: Handle complex requests that involve calendar, document, and email operations
+- **Smart Integration**: Connect calendar events with related emails and documents
 - **Error Handling**: If any tool fails, explain the error to the user and suggest alternatives
 - **Smart Tool Selection**: Choose the appropriate tools based on user requests
 
@@ -75,18 +103,22 @@ class CalendarAssistantPro:
 - The timings provided by the user will all be in IST. You should also always use same timezone for all the operations.
 - When creating/updating events, use proper ISO 8601 datetime format (YYYY-MM-DDTHH:MM:SS)
 - For Notion searches, use relevant keywords and try different query types if needed
+- For Gmail operations, use appropriate search queries and handle email threads properly
 - When user mentions documents, topics, or queries, use the appropriate Notion tools to search and fetch content
-- Provide helpful context by combining information from both calendar and Notion
+- When user mentions emails, use Gmail tools to search, read, or send emails
+- Provide helpful context by combining information from calendar, Notion, and Gmail
 - If a tool call fails, explain the error and suggest what the user can do instead
 - Be conversational and helpful, not robotic
 
 ## 🚀 **Example Interactions:**
-- "I have a meeting on financial reports tomorrow" → Use notion__search for financial documents + calendar__list-events
-- "Create a meeting about project planning" → Use notion__search for project docs + calendar__create-event
-- "What documents do I have about Q4 planning?" → Use notion__search to find relevant documents
-- "Schedule a follow-up meeting for the marketing campaign" → Use notion__search for marketing docs + calendar__create-event
+- "I have a meeting on financial reports tomorrow" → Use notion__search + calendar__list-events + gmail__search for related emails
+- "Create a meeting about project planning and email the team" → Use notion__search + calendar__create-event + gmail__send
+- "What emails did I receive about Q4 planning?" → Use gmail__search + notion__search for related documents
+- "Schedule a follow-up meeting for the marketing campaign and send invites" → Use notion__search + calendar__create-event + gmail__send
+- "Find emails from my manager this week" → Use gmail__search with sender and date filters
+- "Send a summary of today's meeting to the team" → Use notion__search for meeting notes + gmail__send
 
-You have access to both calendar and Notion tools. Use them intelligently based on what the user is asking for!"""
+You have access to calendar, Notion, and Gmail tools. Use them intelligently based on what the user is asking for to provide comprehensive assistance!"""
 
     async def _call_tool_safely(self, orchestrator: MCPOrchestratorPro, tool_name: str, args: Dict[str, Any], tool_call_id: str) -> Dict[str, Any]:
         """Safely call a tool and return a standardized result."""
@@ -120,21 +152,23 @@ You have access to both calendar and Notion tools. Use them intelligently based 
 
     async def run_chat(self):
         """Main chat loop for Calendar Assistant Pro."""
-        print("🗓️📝 Calendar Assistant Pro - Enhanced with Notion Integration")
-        print("=" * 70)
-        print(f"Managing calendar and Notion workspace for: {self.user_email}")
+        print("🗓️📝📧 Calendar Assistant Pro - Enhanced with Notion & Gmail Integration")
+        print("=" * 75)
+        print(f"Managing calendar, Notion workspace, and Gmail for: {self.user_email}")
         print("Type 'quit' to exit, 'help' for commands")
-        print("=" * 70)
+        print("=" * 75)
 
-        async with MCPOrchestratorPro() as orchestrator:
+        async with MCPOrchestratorPro(gmail_url=self.gmail_url) as orchestrator:
             # Health check
             health = await orchestrator.health_check()
-            print(f"🔍 Service Status: Calendar: {'✅' if health['calendar'] else '❌'}, Notion: {'✅' if health['notion'] else '❌'}")
+            print(f"🔍 Service Status: Calendar: {'✅' if health['calendar'] else '❌'}, Notion: {'✅' if health['notion'] else '❌'}, Gmail: {'✅' if health['gmail'] else '❌'}")
             
             if not health['calendar']:
                 print("⚠️  Warning: Google Calendar MCP server is not accessible. Calendar features will be limited.")
             if not health['notion']:
                 print("⚠️  Warning: Notion MCP server is not accessible. Document features will be limited.")
+            if not health['gmail']:
+                print("⚠️  Warning: Gmail MCP server is not accessible. Email features will be limited.")
             
             print()
 
@@ -170,7 +204,7 @@ You have access to both calendar and Notion tools. Use them intelligently based 
 
                     # Call OpenAI with function calling
                     response = self.openai_client.chat.completions.create(
-                        model="gpt-4o",
+                        model=MODEL,
                         messages=messages,
                         tools=[{
                             "type": "function",
@@ -270,7 +304,7 @@ You have access to both calendar and Notion tools. Use them intelligently based 
     def _show_help(self):
         """Display help information."""
         print("\n📋 **Calendar Assistant Pro - Available Commands:**")
-        print("=" * 50)
+        print("=" * 60)
         print("🗓️ **Calendar Operations:**")
         print("  • 'Show my events this week'")
         print("  • 'Create a meeting tomorrow at 2 PM'")
@@ -284,16 +318,24 @@ You have access to both calendar and Notion tools. Use them intelligently based 
         print("  • 'Find notes from last week's meeting'")
         print("  • 'What documents do I have about marketing?'")
         print()
-        print("🔗 **Combined Operations:**")
-        print("  • 'I have a meeting about Q4 planning - show me relevant docs'")
-        print("  • 'Create a meeting for the marketing campaign and find related documents'")
-        print("  • 'Schedule a follow-up meeting and pull the project notes'")
+        print("� **Gmail Email Operations:**")
+        print("  • 'Check my emails from today'")
+        print("  • 'Send an email to john@example.com'")
+        print("  • 'Find emails about project updates'")
+        print("  • 'Show me unread emails'")
+        print("  • 'List my Gmail labels'")
+        print()
+        print("🔗 **Integrated Operations:**")
+        print("  • 'I have a meeting about Q4 planning - show me relevant docs and emails'")
+        print("  • 'Create a meeting for the marketing campaign and send invites'")
+        print("  • 'Schedule a follow-up meeting and email the details to the team'")
+        print("  • 'Find emails about the project and create a meeting to discuss'")
         print()
         print("🛠️ **System Commands:**")
         print("  • 'help' - Show this help message")
         print("  • 'quit' - Exit the assistant")
-        print("=" * 50)
-        print("💡 **Note:** I can intelligently combine calendar and Notion operations based on your requests!")
+        print("=" * 60)
+        print("💡 **Note:** I can intelligently combine calendar, Notion, and Gmail operations based on your requests!")
 
 
 async def main():

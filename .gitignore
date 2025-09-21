@@ -3,7 +3,7 @@
 .env.*
 
 # Embedded Git repositories
-Gmail-MCP-Server/
+gmail-mcp/
 google-calendar-mcp/
 
 __pycache__/
