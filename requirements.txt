@@ -1,0 +1,15 @@
+# Discord Integration
+discord.py>=2.3.0
+
+# Core Dependencies (existing)
+python-dotenv
+requests
+mcp
+openai
+
+# MCP and FastMCP
+fastmcp
+
+# Additional utilities
+asyncio-throttle
+aiofiles
